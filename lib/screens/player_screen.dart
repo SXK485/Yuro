@@ -52,7 +52,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               if (localName != null)
                 ListTile(
                   leading: const Icon(Icons.restore),
-                  title: const Text('恢复自动字幕'),
+                  title: const Text('清除本地字幕，恢复服务器字幕'),
                   subtitle: Text('当前：$localName'),
                   onTap: () async {
                     Navigator.of(sheetContext).pop();
@@ -83,15 +83,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   Future<void> _restoreAutoSubtitle() async {
     try {
-      await _viewModel.clearLocalSubtitle();
+      final restored = await _viewModel.clearLocalSubtitle();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已恢复自动字幕')),
+        SnackBar(
+          content: Text(
+            restored ? '已恢复服务器自动字幕' : '已清除本地字幕；这个作品没有可用的服务器字幕',
+          ),
+        ),
       );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('恢复自动字幕失败：$error')),
+        SnackBar(content: Text('恢复服务器字幕失败：$error')),
       );
     }
   }

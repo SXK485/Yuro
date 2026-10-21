@@ -204,13 +204,28 @@ class PlayerViewModel extends ChangeNotifier {
       }
     }
     _localSubtitleName = null;
+    await _loadServerSubtitle(context);
+  }
+
+  /// 尝试加载服务器自动匹配的字幕。返回是否真的加载到了。
+  Future<bool> _loadServerSubtitle(PlaybackContext context) async {
     final subtitleFile =
         _subtitleLoader.findSubtitleFile(context.currentFile, context.files);
-    if (subtitleFile?.mediaDownloadUrl != null) {
-      await _subtitleService.loadSubtitle(subtitleFile!.mediaDownloadUrl!);
-    } else {
+    // 有些文件节点只有 stream URL；两者都试，避免“找到了文件但没 URL”导致静默清空。
+    final url = subtitleFile?.mediaDownloadUrl ?? subtitleFile?.mediaStreamUrl;
+    if (url == null || url.isEmpty) {
       _subtitleService.clearSubtitle();
-      AppLogger.debug('未找到字幕文件，清除现有字幕');
+      AppLogger.debug('未找到可用的服务器字幕，清除现有字幕');
+      return false;
+    }
+    try {
+      await _subtitleService.loadSubtitle(url);
+      return true;
+    } catch (e) {
+      // 服务器字幕 404/网络失败时也要把本地字幕清掉，并给出“没有自动字幕”的结果。
+      AppLogger.debug('服务器字幕加载失败: $e');
+      _subtitleService.clearSubtitle();
+      return false;
     }
   }
 
@@ -266,17 +281,30 @@ class PlayerViewModel extends ChangeNotifier {
   }
 
   /// 清除当前音轨的本地字幕记录，并恢复服务器自动匹配。
-  Future<void> clearLocalSubtitle() async {
+  /// 返回服务器字幕是否真的加载成功；`false` 表示这个作品没有可用的自动字幕。
+  Future<bool> clearLocalSubtitle() async {
     final context = currentContext;
-    if (context == null) return;
-    await _localSubtitles.clear(
-      workId: context.work.id,
-      workTitle: context.work.title,
-      audioTitle: context.currentFile.title,
-    );
+    if (context == null) {
+      _localSubtitleName = null;
+      _subtitleService.clearSubtitle();
+      notifyListeners();
+      return false;
+    }
+    try {
+      await _localSubtitles.clear(
+        workId: context.work.id,
+        workTitle: context.work.title,
+        audioTitle: context.currentFile.title,
+      );
+    } catch (e) {
+      AppLogger.debug('清除本地字幕记录失败: $e');
+    }
     _localSubtitleName = null;
-    await _loadSubtitleIfAvailable(context);
+    // 先把本地字幕从显示层移除，再尝试服务器字幕；不能等服务端结果才清。
+    _subtitleService.clearSubtitle();
+    final restored = await _loadServerSubtitle(context);
     notifyListeners();
+    return restored;
   }
 
   Future<void> seekToNextLyric() async {
