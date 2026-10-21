@@ -150,6 +150,19 @@ class _WorkImageGalleryScreenState extends State<WorkImageGalleryScreen> {
                 );
               },
             ),
+            // iOS 式左缘右滑返回；PageView 的 overscroll 是第二重保障。
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 24,
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onHorizontalDragEnd: (details) {
+                  if ((details.primaryVelocity ?? 0) > 250) _close();
+                },
+              ),
+            ),
             IgnorePointer(
               ignoring: !_overlayVisible,
               child: AnimatedOpacity(
