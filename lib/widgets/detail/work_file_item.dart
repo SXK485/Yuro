@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:asmrapp/core/utils/work_image_utils.dart';
 import 'package:asmrapp/data/models/files/child.dart';
 import 'package:asmrapp/utils/logger.dart';
 import 'package:asmrapp/utils/file_size_formatter.dart';
@@ -17,9 +18,10 @@ class WorkFileItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isAudio = file.type?.toLowerCase() == 'audio';
+    final bool isAudio = isAudioFile(file);
+    final bool isImage = isImageFile(file);
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Padding(
       padding: EdgeInsets.only(left: indentation),
       child: ListTile(
@@ -36,14 +38,26 @@ class WorkFileItem extends StatelessWidget {
           ),
         ),
         leading: Icon(
-          isAudio ? Icons.audio_file : Icons.insert_drive_file,
-          color: isAudio ? Colors.green : Colors.blue,
+          isAudio
+              ? Icons.audio_file
+              : isImage
+                  ? Icons.image
+                  : Icons.insert_drive_file,
+          color: isAudio
+              ? Colors.green
+              : isImage
+                  ? Colors.deepPurpleAccent
+                  : Colors.blue,
         ),
         dense: true,
-        onTap: isAudio ? () {
-          AppLogger.debug('点击音频文件: ${file.title}');
-          onFileTap?.call(file);
-        } : null,
+        onTap: (isAudio || isImage)
+            ? () {
+                AppLogger.debug(
+                  '点击${isImage ? '图片' : '音频'}文件: ${file.title}',
+                );
+                onFileTap?.call(file);
+              }
+            : null,
       ),
     );
   }

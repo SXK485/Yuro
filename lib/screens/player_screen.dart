@@ -1,7 +1,9 @@
 import 'package:asmrapp/core/platform/lyric_overlay_manager.dart';
+import 'package:asmrapp/core/utils/work_image_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:asmrapp/presentation/viewmodels/player_viewmodel.dart';
+import 'package:asmrapp/screens/work_image_gallery_screen.dart';
 import 'package:asmrapp/widgets/player/player_controls.dart';
 import 'package:asmrapp/widgets/player/player_progress.dart';
 import 'package:asmrapp/widgets/player/player_cover.dart';
@@ -92,6 +94,20 @@ class _PlayerScreenState extends State<PlayerScreen> {
         SnackBar(content: Text('恢复自动字幕失败：$error')),
       );
     }
+  }
+
+  Future<void> _openImages() async {
+    final playback = _viewModel.currentContext;
+    if (playback == null) return;
+    final images = collectWorkImages(playback.files);
+    if (images.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('这个作品没有可查看的图片')),
+      );
+      return;
+    }
+    // 只 push 图片查看器，不调用 pause/stop —— 音频继续播放。
+    await openWorkImageGallery(context, images: images);
   }
 
   Widget _buildContent() {
@@ -240,6 +256,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
             icon: const Icon(Icons.subtitles_outlined),
             tooltip: '外挂字幕',
             onPressed: _showSubtitleSheet,
+          ),
+          IconButton(
+            icon: const Icon(Icons.photo_library_outlined),
+            tooltip: '查看图片（不停止播放）',
+            onPressed: _openImages,
           ),
           IconButton(
             icon: Icon(

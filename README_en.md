@@ -50,6 +50,7 @@ flutter run
 - Search functionality
 - Favorites collection
 - Local external subtitles: load SRT / VTT / LRC from the player, remembered per work + track
+- Work image viewer: open jpg/png from the file list or player, full-screen swipe gallery without stopping audio
 
 ## Contributing
 

@@ -1,7 +1,9 @@
+import 'package:asmrapp/core/utils/work_image_utils.dart';
+import 'package:asmrapp/data/models/works/work.dart';
+import 'package:asmrapp/screens/work_image_gallery_screen.dart';
 import 'package:asmrapp/widgets/mini_player/mini_player.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:asmrapp/data/models/works/work.dart';
 import 'package:asmrapp/widgets/detail/work_cover.dart';
 import 'package:asmrapp/widgets/detail/work_info.dart';
 import 'package:asmrapp/widgets/detail/work_files_list.dart';
@@ -52,7 +54,8 @@ class DetailScreen extends StatelessWidget {
                       PageRouteBuilder(
                         pageBuilder: (context, animation, secondaryAnimation) =>
                             SimilarWorksScreen(work: work),
-                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                        transitionsBuilder:
+                            (context, animation, secondaryAnimation, child) {
                           const begin = Offset(1.0, 0.0);
                           const end = Offset.zero;
                           const curve = Curves.easeInOut;
@@ -94,6 +97,16 @@ class DetailScreen extends StatelessWidget {
                     return WorkFilesList(
                       files: viewModel.files!,
                       onFileTap: (file) async {
+                        // 图片只打开查看器，不碰播放器；音频继续在后台播放。
+                        if (isImageFile(file)) {
+                          await openWorkImageGallery(
+                            context,
+                            images: collectWorkImages(viewModel.files!),
+                            initial:
+                                WorkImage(file: file, path: file.title ?? ''),
+                          );
+                          return;
+                        }
                         try {
                           await viewModel.playFile(file, context);
                         } catch (e) {
