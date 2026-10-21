@@ -1,14 +1,16 @@
 import 'package:asmrapp/core/subtitle/parsers/subtitle_parser.dart';
 import 'package:asmrapp/core/subtitle/parsers/vtt_parser.dart';
 import 'package:asmrapp/core/subtitle/parsers/lrc_parser.dart';
+import 'package:asmrapp/core/subtitle/parsers/srt_parser.dart';
 import 'package:asmrapp/utils/logger.dart';
 
 class SubtitleParserFactory {
   static final List<SubtitleParser> _parsers = [
     VttParser(),
+    SrtParser(),
     LrcParser(),
   ];
-  
+
   static SubtitleParser? getParser(String content) {
     try {
       return _parsers.firstWhere((parser) => parser.canParse(content));
@@ -17,4 +19,4 @@ class SubtitleParserFactory {
       return null;
     }
   }
-} 
+}

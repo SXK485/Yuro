@@ -28,6 +28,72 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _viewModel = GetIt.I<PlayerViewModel>();
   }
 
+  Future<void> _showSubtitleSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final localName = _viewModel.localSubtitleName;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.file_open_outlined),
+                title: const Text('加载本地外挂字幕'),
+                subtitle: const Text('支持 SRT / VTT / LRC，会记住到当前音轨'),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  await _loadLocalSubtitle();
+                },
+              ),
+              if (localName != null)
+                ListTile(
+                  leading: const Icon(Icons.restore),
+                  title: const Text('恢复自动字幕'),
+                  subtitle: Text('当前：$localName'),
+                  onTap: () async {
+                    Navigator.of(sheetContext).pop();
+                    await _restoreAutoSubtitle();
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _loadLocalSubtitle() async {
+    try {
+      final name = await _viewModel.pickAndLoadLocalSubtitle();
+      if (!mounted || name == null) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已加载本地字幕：$name')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('字幕加载失败：$error')),
+      );
+    }
+  }
+
+  Future<void> _restoreAutoSubtitle() async {
+    try {
+      await _viewModel.clearLocalSubtitle();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已恢复自动字幕')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('恢复自动字幕失败：$error')),
+      );
+    }
+  }
+
   Widget _buildContent() {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 400),
@@ -35,7 +101,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       switchOutCurve: Curves.easeInQuart,
       transitionBuilder: (Widget child, Animation<double> animation) {
         final isLyrics = (child as dynamic).key == const ValueKey('lyrics');
-        
+
         return FadeTransition(
           opacity: animation,
           child: SlideTransition(
@@ -103,7 +169,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
                               color: Colors.transparent,
                               child: Text(
                                 _viewModel.currentTrackInfo?.title ?? '未在播放',
-                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(
                                       fontWeight: FontWeight.w600,
                                     ),
                                 textAlign: TextAlign.center,
@@ -114,7 +183,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
                           if (_viewModel.currentTrackInfo?.artist != null)
                             Text(
                               _viewModel.currentTrackInfo!.artist,
-                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
+                                  ?.copyWith(
                                     color: Theme.of(context)
                                         .colorScheme
                                         .onSurface
@@ -165,6 +237,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
             },
           ),
           IconButton(
+            icon: const Icon(Icons.subtitles_outlined),
+            tooltip: '外挂字幕',
+            onPressed: _showSubtitleSheet,
+          ),
+          IconButton(
             icon: Icon(
               lyricManager.isShowing ? Icons.lyrics : Icons.lyrics_outlined,
             ),
@@ -175,9 +252,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
             builder: (context, _) {
               return IconButton(
                 icon: Icon(
-                  wakeLockController.enabled 
-                    ? Icons.lightbulb
-                    : Icons.lightbulb_outline,
+                  wakeLockController.enabled
+                      ? Icons.lightbulb
+                      : Icons.lightbulb_outline,
                 ),
                 tooltip: wakeLockController.enabled ? '关闭屏幕常亮' : '开启屏幕常亮',
                 onPressed: () => wakeLockController.toggle(),

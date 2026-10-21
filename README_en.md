@@ -49,6 +49,7 @@ flutter run
 - Playlist management
 - Search functionality
 - Favorites collection
+- Local external subtitles: load SRT / VTT / LRC from the player, remembered per work + track
 
 ## Contributing
 

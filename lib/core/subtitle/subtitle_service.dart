@@ -6,20 +6,23 @@ import 'package:get_it/get_it.dart';
 import 'package:asmrapp/core/subtitle/subtitle_loader.dart';
 import 'package:asmrapp/core/subtitle/managers/subtitle_state_manager.dart';
 
-
 class SubtitleService implements ISubtitleService {
-  final _subtitleLoader = GetIt.I<SubtitleLoader>();
+  final SubtitleLoader _subtitleLoader;
   final _stateManager = SubtitleStateManager();
-  
+
+  SubtitleService({SubtitleLoader? subtitleLoader})
+      : _subtitleLoader = subtitleLoader ?? GetIt.I<SubtitleLoader>();
+
   @override
   Stream<SubtitleList?> get subtitleStream => _stateManager.subtitleStream;
-  
+
   @override
-  Stream<Subtitle?> get currentSubtitleStream => _stateManager.currentSubtitleStream;
-  
+  Stream<Subtitle?> get currentSubtitleStream =>
+      _stateManager.currentSubtitleStream;
+
   @override
   Subtitle? get currentSubtitle => _stateManager.currentSubtitle;
-  
+
   @override
   Future<void> loadSubtitle(String url) async {
     try {
@@ -32,7 +35,21 @@ class SubtitleService implements ISubtitleService {
       rethrow;
     }
   }
-  
+
+  @override
+  Future<void> loadLocalSubtitle(String content, {String name = ''}) async {
+    // 先解析、后替换：格式不对时保留当前字幕，不把用户正在看的字幕清空。
+    final subtitleList = _subtitleLoader.parseSubtitleContent(content);
+    if (subtitleList == null || subtitleList.subtitles.isEmpty) {
+      throw const FormatException('字幕文件里没有可用条目');
+    }
+    _stateManager.setSubtitleList(subtitleList);
+    AppLogger.debug(
+      '本地外挂字幕已加载: ${name.isEmpty ? '未命名' : name} '
+      '(${subtitleList.subtitles.length} 条)',
+    );
+  }
+
   @override
   void updatePosition(Duration position) {
     _stateManager.updatePosition(position);
@@ -52,10 +69,10 @@ class SubtitleService implements ISubtitleService {
   }
 
   @override
-  Stream<SubtitleWithState?> get currentSubtitleWithStateStream => 
+  Stream<SubtitleWithState?> get currentSubtitleWithStateStream =>
       _stateManager.currentSubtitleWithStateStream;
-  
+
   @override
-  SubtitleWithState? get currentSubtitleWithState => 
+  SubtitleWithState? get currentSubtitleWithState =>
       _stateManager.currentSubtitleWithState;
-} 
+}

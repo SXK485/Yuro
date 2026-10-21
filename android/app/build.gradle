@@ -27,7 +27,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "one.asmr.yuro"
+        applicationId = "one.asmr.yuro.fork"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -47,10 +47,12 @@ android {
 
     buildTypes {
         release {
-            signingConfig signingConfigs.release
-            // 如果还有问题，可以临时禁用混淆
-            minifyEnabled true  // 改为 false 可以禁用混淆
-            shrinkResources true  // 改为 false 可以禁用资源压缩
+            // 本 fork 默认没有发布签名证书；没有 key.properties 时用 debug 签名，
+            // 保证 `flutter build apk --release` 能产出可直接安装的 APK。
+            signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
+            // 外挂字幕功能不涉及原生代码，关闭混淆/R8 以避免插件反射被裁掉。
+            minifyEnabled false
+            shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }

@@ -12,6 +12,7 @@ import '../../data/repositories/auth_repository.dart';
 import '../subtitle/i_subtitle_service.dart';
 import '../subtitle/subtitle_service.dart';
 import '../subtitle/subtitle_loader.dart';
+import '../subtitle/storage/local_subtitle_repository.dart';
 import '../../core/audio/storage/i_playback_state_repository.dart';
 import '../../core/audio/storage/playback_state_repository.dart';
 import '../audio/events/playback_event_hub.dart';
@@ -45,12 +46,18 @@ Future<void> setupServiceLocator() async {
     ),
   );
 
+  // 本地外挂字幕仓库（按作品/音轨持久化）
+  getIt.registerLazySingleton<LocalSubtitleRepository>(
+    () => LocalSubtitleRepository(prefs),
+  );
+
   // 注册 PlayerViewModel
   getIt.registerLazySingleton<PlayerViewModel>(
     () => PlayerViewModel(
       audioService: getIt(),
       eventHub: getIt(),
       subtitleService: getIt(),
+      localSubtitleRepository: getIt(),
     ),
   );
 
@@ -99,14 +106,16 @@ Future<void> setupServiceLocator() async {
 Future<void> setupSubtitleServices() async {
   getIt.registerLazySingleton<SubtitleLoader>(() => SubtitleLoader());
   if (Platform.isAndroid) {
-    getIt.registerLazySingleton<ILyricOverlayController>(() => LyricOverlayController());
+    getIt.registerLazySingleton<ILyricOverlayController>(
+        () => LyricOverlayController());
   } else {
-    getIt.registerLazySingleton<ILyricOverlayController>(() => DummyLyricOverlayController());
+    getIt.registerLazySingleton<ILyricOverlayController>(
+        () => DummyLyricOverlayController());
   }
   getIt.registerLazySingleton(() => LyricOverlayManager(
-    controller: getIt(),
-    subtitleService: getIt(),
-  ));
+        controller: getIt(),
+        subtitleService: getIt(),
+      ));
 
   // 初始化悬浮窗管理器
   await getIt<LyricOverlayManager>().initialize();
