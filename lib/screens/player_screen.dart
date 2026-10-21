@@ -36,6 +36,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
       showDragHandle: true,
       builder: (sheetContext) {
         final localName = _viewModel.localSubtitleName;
+        final savedName = _viewModel.savedLocalSubtitleName;
+        final usingLocal = _viewModel.hasLocalSubtitle;
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -49,14 +51,34 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   await _loadLocalSubtitle();
                 },
               ),
-              if (localName != null)
+              if (usingLocal)
                 ListTile(
-                  leading: const Icon(Icons.restore),
-                  title: const Text('清除本地字幕，恢复服务器字幕'),
-                  subtitle: Text('当前：$localName'),
+                  leading: const Icon(Icons.cloud_outlined),
+                  title: const Text('切换到服务器字幕'),
+                  subtitle: Text('本地字幕仍保留：$localName'),
                   onTap: () async {
                     Navigator.of(sheetContext).pop();
-                    await _restoreAutoSubtitle();
+                    await _useServerSubtitle();
+                  },
+                ),
+              if (!usingLocal && savedName != null)
+                ListTile(
+                  leading: const Icon(Icons.restore),
+                  title: const Text('恢复本地字幕'),
+                  subtitle: Text('已保存：$savedName'),
+                  onTap: () async {
+                    Navigator.of(sheetContext).pop();
+                    await _restoreLocalSubtitle();
+                  },
+                ),
+              if (savedName != null)
+                ListTile(
+                  leading: const Icon(Icons.delete_outline, color: Colors.red),
+                  title: const Text('删除本地字幕记录'),
+                  subtitle: Text(savedName),
+                  onTap: () async {
+                    Navigator.of(sheetContext).pop();
+                    await _confirmForgetLocalSubtitle();
                   },
                 ),
             ],
@@ -81,23 +103,72 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
   }
 
-  Future<void> _restoreAutoSubtitle() async {
+  Future<void> _useServerSubtitle() async {
     try {
-      final restored = await _viewModel.clearLocalSubtitle();
+      final restored = await _viewModel.useServerSubtitle();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            restored ? '已恢复服务器自动字幕' : '已清除本地字幕；这个作品没有可用的服务器字幕',
+            restored
+                ? '已切换到服务器字幕（本地字幕仍保留，可随时恢复）'
+                : '已切换到服务器字幕；这个作品没有服务器字幕（本地字幕仍保留）',
           ),
         ),
       );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('恢复服务器字幕失败：$error')),
+        SnackBar(content: Text('切换服务器字幕失败：$error')),
       );
     }
+  }
+
+  Future<void> _restoreLocalSubtitle() async {
+    try {
+      final restored = await _viewModel.useSavedLocalSubtitle();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            restored
+                ? '已恢复本地字幕：${_viewModel.savedLocalSubtitleName ?? ''}'
+                : '没有找到已保存的本地字幕，请重新选择文件',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('恢复本地字幕失败：$error')),
+      );
+    }
+  }
+
+  Future<void> _confirmForgetLocalSubtitle() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('删除本地字幕记录？'),
+        content: const Text('只会删除这个音轨记住的本地字幕文件，不会影响音频。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _viewModel.forgetLocalSubtitle();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已删除本地字幕记录')),
+    );
   }
 
   Future<void> _openImages() async {

@@ -25,6 +25,7 @@ class PlayerViewModel extends ChangeNotifier {
   Duration? _duration;
   Subtitle? _currentSubtitle;
   String? _localSubtitleName;
+  String? _savedLocalSubtitleName;
 
   final List<StreamSubscription> _subscriptions = [];
 
@@ -192,10 +193,12 @@ class PlayerViewModel extends ChangeNotifier {
         await _subtitleService.loadLocalSubtitle(local.content,
             name: local.name);
         _localSubtitleName = local.name;
+        _savedLocalSubtitleName = local.name;
         return;
       } catch (e) {
         // 字幕文件损坏/格式不再受支持：清掉记录并回退服务器字幕。
         AppLogger.debug('本地外挂字幕加载失败，回退服务器字幕: $e');
+        _savedLocalSubtitleName = null;
         await _localSubtitles.clear(
           workId: context.work.id,
           workTitle: context.work.title,
@@ -204,6 +207,7 @@ class PlayerViewModel extends ChangeNotifier {
       }
     }
     _localSubtitleName = null;
+    if (local == null) _savedLocalSubtitleName = null;
     await _loadServerSubtitle(context);
   }
 
@@ -232,7 +236,9 @@ class PlayerViewModel extends ChangeNotifier {
   AudioTrackInfo? get currentTrackInfo => _audioService.currentTrack;
   PlaybackContext? get currentContext => _audioService.currentContext;
   String? get localSubtitleName => _localSubtitleName;
+  String? get savedLocalSubtitleName => _savedLocalSubtitleName;
   bool get hasLocalSubtitle => _localSubtitleName != null;
+  bool get hasSavedLocalSubtitle => _savedLocalSubtitleName != null;
 
   /// 选择并加载本地外挂字幕（SRT / VTT / LRC），并记住到当前音轨。
   Future<String?> pickAndLoadLocalSubtitle() async {
@@ -272,6 +278,7 @@ class PlayerViewModel extends ChangeNotifier {
         name: file.name,
         content: content,
       );
+      _savedLocalSubtitleName = file.name;
     } catch (e) {
       // 保存失败不影响本次播放，但下次进入不会自动恢复。
       AppLogger.debug('本地外挂字幕保存失败: $e');
@@ -280,9 +287,9 @@ class PlayerViewModel extends ChangeNotifier {
     return file.name;
   }
 
-  /// 清除当前音轨的本地字幕记录，并恢复服务器自动匹配。
-  /// 返回服务器字幕是否真的加载成功；`false` 表示这个作品没有可用的自动字幕。
-  Future<bool> clearLocalSubtitle() async {
+  /// 临时切换到服务器自动字幕；**保留**已保存的本地字幕，之后可一键恢复。
+  /// 返回服务器字幕是否真的加载成功。
+  Future<bool> useServerSubtitle() async {
     final context = currentContext;
     if (context == null) {
       _localSubtitleName = null;
@@ -290,21 +297,69 @@ class PlayerViewModel extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    _localSubtitleName = null;
+    _subtitleService.clearSubtitle();
+    final restored = await _loadServerSubtitle(context);
+    notifyListeners();
+    return restored;
+  }
+
+  /// 重新加载此前保存的本地外挂字幕（不需要重新选文件）。
+  Future<bool> useSavedLocalSubtitle() async {
+    final context = currentContext;
+    if (context == null) return false;
+    final local = await _localSubtitles.load(
+      workId: context.work.id,
+      workTitle: context.work.title,
+      audioTitle: context.currentFile.title,
+    );
+    if (local == null) {
+      _savedLocalSubtitleName = null;
+      notifyListeners();
+      return false;
+    }
     try {
+      await _subtitleService.loadLocalSubtitle(local.content, name: local.name);
+      _localSubtitleName = local.name;
+      _savedLocalSubtitleName = local.name;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      AppLogger.debug('恢复本地字幕失败: $e');
+      _savedLocalSubtitleName = null;
       await _localSubtitles.clear(
         workId: context.work.id,
         workTitle: context.work.title,
         audioTitle: context.currentFile.title,
       );
-    } catch (e) {
-      AppLogger.debug('清除本地字幕记录失败: $e');
+      notifyListeners();
+      return false;
     }
-    _localSubtitleName = null;
-    // 先把本地字幕从显示层移除，再尝试服务器字幕；不能等服务端结果才清。
-    _subtitleService.clearSubtitle();
-    final restored = await _loadServerSubtitle(context);
+  }
+
+  /// 彻底删除当前音轨的本地字幕记录；如果正在显示本地字幕，则回退服务器字幕。
+  Future<void> forgetLocalSubtitle() async {
+    final context = currentContext;
+    if (context != null) {
+      try {
+        await _localSubtitles.clear(
+          workId: context.work.id,
+          workTitle: context.work.title,
+          audioTitle: context.currentFile.title,
+        );
+      } catch (e) {
+        AppLogger.debug('删除本地字幕记录失败: $e');
+      }
+    }
+    _savedLocalSubtitleName = null;
+    if (_localSubtitleName != null) {
+      _localSubtitleName = null;
+      _subtitleService.clearSubtitle();
+      if (context != null) {
+        await _loadServerSubtitle(context);
+      }
+    }
     notifyListeners();
-    return restored;
   }
 
   Future<void> seekToNextLyric() async {
